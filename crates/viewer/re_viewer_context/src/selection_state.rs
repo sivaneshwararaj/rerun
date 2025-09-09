@@ -143,6 +143,7 @@ impl ApplicationSelectionState {
         &self.selection_previous_frame
     }
 
+    /// Returns the items selected this frame.
     pub fn new_selected_items(&self) -> &ItemCollection {
         &self.selection_this_frame
     }
