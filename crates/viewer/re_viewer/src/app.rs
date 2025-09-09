@@ -521,6 +521,21 @@ impl App {
         }
     }
 
+    /// Updates the web address on web. Noop on native.
+    fn update_web_address_bar(&self, store_hub: &StoreHub) {
+        let rec_cfg = store_hub
+            .active_recording()
+            .and_then(|db| self.state.recording_config(db.store_id()));
+        let time_ctrl = rec_cfg.as_ref().map(|cfg| cfg.time_ctrl.read());
+        update_web_address_bar(
+            self.startup_options.web_history_enabled(),
+            store_hub,
+            self.state.navigation.peek(),
+            self.state.selection_state.new_selected_items().first_item(),
+            time_ctrl.as_deref(),
+        );
+    }
+
     #[allow(clippy::unused_self)]
     fn run_system_command(
         &mut self,
@@ -528,29 +543,16 @@ impl App {
         store_hub: &mut StoreHub,
         egui_ctx: &egui::Context,
     ) {
-        let update_address_bar = |this: &Self, store_hub: &mut StoreHub| {
-            let rec_cfg = store_hub
-                .active_recording()
-                .and_then(|db| this.state.recording_config(db.store_id()));
-            let time_ctrl = rec_cfg.as_ref().map(|cfg| cfg.time_ctrl.read());
-            update_web_address_bar(
-                this.startup_options.web_history_enabled(),
-                store_hub,
-                this.state.navigation.peek(),
-                this.state.selection_state.new_selected_items().first_item(),
-                time_ctrl.as_deref(),
-            );
-        };
         match cmd {
             SystemCommand::ActivateApp(app_id) => {
                 self.state.navigation.replace(DisplayMode::LocalRecordings);
                 store_hub.set_active_app(app_id);
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
             }
 
             SystemCommand::CloseApp(app_id) => {
                 store_hub.close_app(&app_id);
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
             }
 
             SystemCommand::ActivateRecordingOrTable(entry) => {
@@ -565,7 +567,7 @@ impl App {
                             .replace(DisplayMode::LocalTable(table_id.clone()));
                     }
                 }
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
             }
 
             SystemCommand::CloseRecordingOrTable(entry) => {
@@ -606,7 +608,7 @@ impl App {
 
                 store_hub.remove(&entry);
 
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
             }
 
             SystemCommand::CloseAllEntries => {
@@ -646,7 +648,7 @@ impl App {
                 // _which_ recording is about to be selected.
                 // I.e. if we update navigation bar here, this would become order dependent.
                 if display_mode != DisplayMode::LocalRecordings {
-                    update_address_bar(self, store_hub);
+                    self.update_web_address_bar(store_hub);
                 }
 
                 self.state.navigation.replace(display_mode);
@@ -788,7 +790,7 @@ impl App {
                 }
 
                 self.state.selection_state.set_selection(items);
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
                 egui_ctx.request_repaint(); // Make sure we actually see the new selection.
             }
 
@@ -812,7 +814,7 @@ impl App {
                         "SystemCommand::SetActiveTime ignored: unknown store ID '{store_id:?}'"
                     );
                 }
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
             }
 
             SystemCommand::SetLoopSelection {
@@ -833,7 +835,7 @@ impl App {
             }
 
             SystemCommand::SetFocus(item) => {
-                update_address_bar(self, store_hub);
+                self.update_web_address_bar(store_hub);
                 self.state.focused_item = Some(item);
             }
 
@@ -1555,16 +1557,7 @@ impl App {
             }
         }
 
-        let rec_cfg = self.state.recording_config(entity_db.store_id());
-        let time_ctrl = rec_cfg.as_ref().map(|cfg| cfg.time_ctrl.read());
-
-        update_web_address_bar(
-            self.startup_options.web_history_enabled(),
-            storage_context.hub,
-            self.state.navigation.peek(),
-            self.state.selection_state.selected_items().first_item(),
-            time_ctrl.as_deref(),
-        );
+        self.update_web_address_bar(storage_context.hub);
     }
 
     /// Retrieve the link to the current viewer.
